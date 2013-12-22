@@ -21,13 +21,27 @@ along with Icecast2ListenersPerRoomMuninPlugin. If not, see <http://www.gnu.org/
 
 require 'rubygems'
 require 'mechanize'
+require 'dnsruby'
 
-def get_servers
+def get_server(domain)
   servers = []
-  servers << {:name => "relay2", :url => "http://foo.bar:8000/"}
-  servers << {:name => "relay3", :url => "http://foo-baz:8000/"}
-  servers << {:name => "relay4", :url => "http://bla.blub:8000/"}
 
+  Dnsruby::DNS.open() { |dns|
+    dns.each_resource(domain, "A") { |rr|
+      ip = rr.address
+      # use forward dns name, if available
+      begin
+        name = dns.getname(ip).to_s
+      rescue Dnsruby::NXDomain => e
+        name = ip.to_s
+      end
+      label = name.gsub("-","_")
+      label.gsub!(".","_")
+      servers << {:name => label, :label=> name, :url => "http://#{ip}:8000/status.xsl"}
+    }
+  }
+
+  print servers
   servers
 end
 
@@ -94,7 +108,7 @@ end
 
 begin
   login   = {:user => 'admin', :password => 'vocgotEfon4'}
-  servers = get_servers
+  servers = get_servers('audio.streaming.media.ccc.de')
   rooms   = get_rooms
   
   if ARGV[0] == "config"
